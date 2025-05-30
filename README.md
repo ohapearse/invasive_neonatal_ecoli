@@ -9,6 +9,7 @@ Supplementary data is in the data folder, and includes three files:
 1) Overall blood culture numbers for QECH: "Supp_tab_4_culture.csv"
 2) Individual patient information and genomic data: "Supp_tab_3_genomes.csv"
 3) AMR genes, outputs from AMRfinder: "ecoli_invasive_amrfinder.txt"
+4) **Add the accessions for both short and long reads**
 
 ## Figures and Supplementary figures
 
@@ -17,6 +18,8 @@ The Rmarkdown document ecoli_invasive_markdown.Rmd contains the code to generate
 ## Citation
 
 If you use the data from this repository please cite:
+
+**Add paper citation when it is published**
 
 High diversity of Escherichia coli causing invasive disease in neonates in Malawi poses challenges for O-antigen based vaccine approach
 Oliver Pearse, Allan Zuza, Edith Tewesa, Patricia Siyabuh, Alice J Fraser, Jennifer Cornick, Kondwani Kawaza, Patrick Musicha, Nicholas R Thomson, Nicholas A Feasey, Eva Heinz
