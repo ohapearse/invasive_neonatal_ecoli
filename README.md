@@ -1,15 +1,16 @@
 # Invasive Escherichia coli in neonates in Chatinkha nursery
 
-Supplementary materials and code generating figures for a paper describing the genomics of invasive E. coli in neonates in Malawi
+Supplementary materials and code generating figures for a paper describing the genomics of invasive E. coli in neonates in Malawi. Here we use whole genome sequencing to describe the antigenic and overall diversity of Escherichia coli isolates causing invasive infections in neonates in a single hospital in Malawi. We show high levels of O-antigen diversity, highlighting the difficulty of developing a vaccine in this patient population and emphasizing the need for more data from this patient population.
 
 ## Supplementary data
 
-Supplementary data is in the data folder, and includes three files:
+Supplementary data is in the data folder, and includes five files:
 
-1) Overall blood culture numbers for QECH: "Supp_tab_4_culture.csv"
-2) Individual patient information and genomic data: "Supp_tab_3_genomes.csv"
-3) AMR genes, outputs from AMRfinder: "ecoli_invasive_amrfinder.txt"
-4) **Add the accessions for both short and long reads**
+1) Accession numbers for short read data: "Supp_data_1_shortreads.csv"
+2) Accession numbers for long read data: "Supp_data_2_longreads.csv"
+3)  Overall blood culture numbers for QECH: "Supp_data_4_culture.csv"
+4) Individual patient information and genomic data: "Supp_data_3_genomes.csv"
+5) AMR genes, outputs from AMRfinder: "Supp_data_5_amr.csv"
 
 ## Figures and Supplementary figures
 
@@ -28,4 +29,4 @@ medRxiv 2024.09.24.24314145; doi: https://doi.org/10.1101/2024.09.24.24314145
 ## License
 
 This project is licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0).  
-See the Licence.txt file for details.
+See the licence.txt file for details.
