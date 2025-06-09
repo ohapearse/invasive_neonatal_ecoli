@@ -1,0 +1,1151 @@
+---
+title: "High diversity of Escherichia coli causing invasive disease in neonates in Malawi poses challenges for O-antigen based vaccine approach"
+author:
+date:
+output:
+  word_document:
+---
+
+
+
+```{r loading data, echo = FALSE, message = FALSE, warning = FALSE}
+
+#loading in packages
+library(here)
+library(tidyverse)
+library(ggpubr)
+library(lubridate)
+library(ghibli)
+library(RColorBrewer)
+library(pals)
+library(flextable)
+theme_set(theme_bw())
+
+#creating functions
+#calculates percent
+percent <- function(top, bottom, z = 1){
+  result <- round(top / bottom * 100, digits = z)
+  return(result)
+}
+
+#extracts values from glm
+extract_values <- function(model){
+  effect <- coefficients(summary(model))[2]
+  p <- coefficients(summary(model))[8]
+  both <- paste("(", round(effect * 100, 1), "% change per year; ", "p", " = ", format.pval(p, digits = 2), "; Figure 5)", sep = "")
+  return(both)
+}
+
+#loading data
+culture_data <- read.csv(here("data", "Supp_data_4_culture.csv"))
+genome_data <- read.csv(here("data", "Supp_data_3_genomes.csv"))
+amrfinder <- read.csv(here("data", "Supp_data_5_amr.csv"))
+
+#editing data for graphing
+#his gives the number of neonatal ecoli per 1000 blood cultures by year
+rawneo <- culture_data %>%
+  filter(neo == "Neonate") %>%
+  group_by(Year, ecoli) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n)) %>%
+  filter(ecoli == "E. coli") %>%
+  mutate(freq = freq * 1000) %>%
+  filter(Year > 1999)
+
+#gives overal numbers of ecoli per 1000 blood cultures by uear
+rawall <- culture_data %>%
+  group_by(Year, ecoli) %>%
+  summarise(n = n()) %>%
+  mutate(freq = n / sum(n)) %>%
+  filter(ecoli == "E. coli") %>%
+  mutate(freq = freq * 1000) %>%
+  filter(Year > 1999)
+
+#creating just ecoli dataframes
+rawecoli <- culture_data %>%
+  filter(ecoli == "E. coli")
+
+#isolates that passed qc
+good_overall <- genome_data %>%
+  filter(!is.na(O_overall))
+
+```
+
+
+## Main text
+
+```{r clinical, echo = FALSE, warning = FALSE}
+
+#editing the hospital data
+clin <- genome_data %>%
+  select(hosp_id, ward, Year, Gender, PatientAge, AgeUnit, ProfileName, Amikacin.30, Ampicillin.10, 
+         Augmentin.30, Cefoxitin.30, Cefpodoxime.10..Ceftriaxone., Chloramphenicol.30, Ciprofloxacin.5, 
+         Cotrimoxazole.25, Gentamicin.10, Meropenem.10, Pefloxacin.5, Piperacillin.Tazobactam.36, ) %>%
+  distinct(hosp_id, .keep_all = TRUE)
+
+#categorising data by year
+timeline <- clin %>%
+  group_by(Year, ward) %>%
+  count() %>%
+  filter(!is.na(ward)) 
+timeline2 <- clin %>%
+  group_by(Year) %>%
+  count()
+
+#categorising data by patient age
+age <- clin %>%
+  group_by(PatientAge) %>%
+  count() %>%
+  mutate(category = case_when(PatientAge > 3 ~ "Late",
+                              TRUE ~ "Early"))
+
+
+```
+
+
+```{r resistance analysis, echo = FALSE}
+#analysing amr data
+resistant <- clin %>%
+  select(-ward, -Gender, -PatientAge, -AgeUnit, -ProfileName) %>%
+  pivot_longer(cols = c("Amikacin.30",
+                       "Ampicillin.10",
+                       "Augmentin.30",
+                       "Cefoxitin.30",
+                       "Cefpodoxime.10..Ceftriaxone.",
+                       "Chloramphenicol.30",
+                       "Ciprofloxacin.5",
+                       "Cotrimoxazole.25", 
+                       "Gentamicin.10",
+                       "Meropenem.10",
+                       "Pefloxacin.5",
+                       "Piperacillin.Tazobactam.36"),
+              names_to = "antibiotic",
+              values_to = "resistant") %>%
+  filter(antibiotic != "Cefoxitin.30",
+         antibiotic != "Pefloxacin.5",
+         antibiotic != "Piperacillin.Tazobactam.36")
+
+resistant_total <- resistant %>%
+  filter(resistant != "") %>%
+  group_by(Year, antibiotic) %>%
+  count() %>%
+  rename(total = n)
+
+resistant_res <- resistant %>%
+  filter(resistant != "",
+         resistant != "S") %>%
+  group_by(Year, antibiotic) %>%
+  count() %>%
+  full_join(resistant_total, by = c("Year", "antibiotic")) %>%
+  replace_na(list(n = 0)) %>%
+  mutate(percent = percent(n, total))
+
+resistant_standard <- clin %>% 
+  filter(Cefpodoxime.10..Ceftriaxone. == "R", Gentamicin.10 == "R", Ampicillin.10 == "R") %>%
+  mutate(category = case_when(PatientAge > 3 ~ "Late",
+                              TRUE ~ "Early"))
+
+resistant_age <- clin %>%
+  mutate(category = case_when(PatientAge > 3 ~ "Late",
+                              TRUE ~ "Early")) %>%
+  select(-ward, -Gender, -PatientAge, -AgeUnit, -ProfileName) %>%
+  pivot_longer(cols = c("Amikacin.30",
+                       "Ampicillin.10",
+                       "Augmentin.30",
+                       "Cefoxitin.30",
+                       "Cefpodoxime.10..Ceftriaxone.",
+                       "Chloramphenicol.30",
+                       "Ciprofloxacin.5",
+                       "Cotrimoxazole.25", 
+                       "Gentamicin.10",
+                       "Meropenem.10",
+                       "Pefloxacin.5",
+                       "Piperacillin.Tazobactam.36"),
+              names_to = "antibiotic",
+              values_to = "resistant") %>%
+  filter(antibiotic != "Cefoxitin.30",
+         antibiotic != "Pefloxacin.5",
+         antibiotic != "Piperacillin.Tazobactam.36")
+
+resistant_res_graph <- resistant_res %>%
+  mutate(line = case_when(antibiotic == "Amikacin.30" ~ "Occasional use",
+                                antibiotic == "Ampicillin.10" ~ "First-line",
+                                antibiotic == "Augmentin.30" ~ "Not used",
+                                antibiotic == "Cefpodoxime.10..Ceftriaxone." ~ "Second-line",
+                                antibiotic == "Chloramphenicol.30" ~ "Not used",
+                                antibiotic == "Ciprofloxacin.5" ~ "Not used",
+                                antibiotic == "Cotrimoxazole.25" ~ "Not used",
+                                antibiotic == "Gentamicin.10" ~ "First-line",
+                                antibiotic == "Meropenem.10" ~ "Occasional use",
+                                TRUE ~ "check this")) %>%
+  mutate(antibiotic = case_when(antibiotic == "Amikacin.30" ~ "Amikacin",
+                                antibiotic == "Ampicillin.10" ~ "Ampicillin",
+                                antibiotic == "Augmentin.30" ~ "Co-amoxiclav",
+                                antibiotic == "Cefpodoxime.10..Ceftriaxone." ~ "Ceftriaxone",
+                                antibiotic == "Chloramphenicol.30" ~ "Chloramphenicol",
+                                antibiotic == "Ciprofloxacin.5" ~ "Ciprofloxacin",
+                                antibiotic == "Cotrimoxazole.25" ~ "Co-trimoxazole",
+                                antibiotic == "Gentamicin.10" ~ "Gentamicin",
+                                antibiotic == "Meropenem.10" ~ "Meropenem",
+                                TRUE ~ "check this")) %>%
+  ungroup() %>%
+  mutate(line = fct_relevel(line, "First-line", "Second-line", "Occasional use"))
+
+
+resistant_forglm <- resistant_res_graph %>% 
+  mutate(percent = percent / 100) %>%
+  pivot_wider(id_cols = "Year", names_from = "antibiotic", values_from = "percent")
+
+resistant_glm2 <- resistant %>%
+  mutate(resistant = case_when(resistant == "R" | resistant == "I" ~ 1,
+                               resistant == "S" ~ 0,
+                               TRUE ~ NA)) %>%
+  mutate(antibiotic = case_when(antibiotic == "Amikacin.30" ~ "Amikacin",
+                                antibiotic == "Ampicillin.10" ~ "Ampicillin",
+                                antibiotic == "Augmentin.30" ~ "Co-amoxiclav",
+                                antibiotic == "Cefpodoxime.10..Ceftriaxone." ~ "Ceftriaxone",
+                                antibiotic == "Chloramphenicol.30" ~ "Chloramphenicol",
+                                antibiotic == "Ciprofloxacin.5" ~ "Ciprofloxacin",
+                                antibiotic == "Cotrimoxazole.25" ~ "Co-trimoxazole",
+                                antibiotic == "Gentamicin.10" ~ "Gentamicin",
+                                antibiotic == "Meropenem.10" ~ "Meropenem",
+                                TRUE ~ "check this"))
+
+#amr models
+amp_glm <- glm(resistant ~ Year, 
+               family = binomial(link = "logit"),
+               data = resistant_glm2 %>% filter(antibiotic == "Ampicillin"))
+chlor_glm <- glm(resistant ~ Year, 
+               family = binomial(link = "logit"),
+               data = resistant_glm2 %>% filter(antibiotic == "Chloramphenicol"))
+cotrim_glm <-glm(resistant ~ Year, 
+               family = binomial(link = "logit"),
+               data = resistant_glm2 %>% filter(antibiotic == "Co-trimoxazole"))
+gent_glm <- glm(resistant ~ Year, 
+               family = binomial(link = "logit"),
+               data = resistant_glm2 %>% filter(antibiotic == "Gentamicin"))
+coamox_glm <- glm(resistant ~ Year, 
+               family = binomial(link = "logit"),
+               data = resistant_glm2 %>% filter(antibiotic == "Co-amoxiclav"))
+cef_glm <- glm(resistant ~ Year, 
+               family = binomial(link = "logit"),
+               data = resistant_glm2 %>% filter(antibiotic == "Ceftriaxone"))
+cipro_glm <- glm(resistant ~ Year, 
+               family = binomial(link = "logit"),
+               data = resistant_glm2 %>% filter(antibiotic == "Ciprofloxacin"))
+amik_glm <- glm(resistant ~ Year, 
+               family = binomial(link = "logit"),
+               data = resistant_glm2 %>% filter(antibiotic == "Amikacin"))
+mero_glm <- glm(resistant ~ Year, 
+               family = binomial(link = "logit"),
+               data = resistant_glm2 %>% filter(antibiotic == "Meropenem"))
+
+#extracting the values
+#amp no trend
+amp_values <- extract_values(amp_glm)
+#chlor reduced
+chlor_values <- extract_values(chlor_glm)
+#cotrim - trend towards increase
+cotrim_values <- extract_values(cotrim_glm)
+#gent - trend towards increase
+gent_values <- extract_values(gent_glm)
+#coamox trend towards decrease
+coamox_values <- extract_values(coamox_glm)
+#cef increase
+cef_values <- extract_values(cef_glm)
+#cipro increase
+cipro_values <- extract_values(cipro_glm)
+#amik trend towards increase
+amik_values <- extract_values(amik_glm)
+#mero not enough data
+mero_values <- extract_values(mero_glm)
+
+
+```
+
+
+### Figure 1
+
+```{r figure 1, echo = FALSE, warning = FALSE, message = FALSE, fig.cap = "Figure 1", fig.dim = c(10, 10)}
+
+#define colours
+cols <- c("All patients" = "black", "Neonates" = "mediumpurple1")
+
+#plot raw numbers
+ecoli_overall_numbers <- ggplot() +
+  geom_bar(data = rawecoli, aes(x = Year, fill = neo), colour = "black") +
+  scale_fill_ghibli_d(name = "LaputaMedium", 
+                      direction = -1) +
+  xlab("Year of isolation") +
+  ylab("Number of E. coli\nisolates") +
+  labs(fill = "Patient population") +
+  xlim(1999, 2022) +
+  theme_bw()
+
+#plot incidence
+ecoli_overall_incidence <- ggplot() +
+  xlab("Year of isolation") +
+  ylab("E. coli sample positivity\n(per 1,000 blood cultures/CSF)") +
+  geom_line(data = rawall, aes(x = Year, y = freq, colour = "All patients"), lwd = 1.2) +
+  geom_point(data = rawall, aes(x = Year, y = freq, colour = "All patients")) +
+  geom_line(data = rawneo, aes(x = Year, y = freq, colour = "Neonates"), lwd = 1.2) +
+  geom_point(data = rawneo, aes(x = Year, y = freq, colour = "Neonates")) +
+  scale_colour_manual(name="Patient population",values=cols) + 
+  xlim(1999, 2022) +
+  ylim(0, 50) +
+  theme_bw()
+
+#plot age 
+age_ecoli <- ggplot(age) +
+  geom_col(aes(x = PatientAge, y = n, fill = category), colour = "black") +
+  #geom_vline(xintercept = median(clin$PatientAge, na.rm = TRUE), lwd = 1) +
+  labs(x = "Age (days)",
+       y = "Number of cases",
+       fill = "Early or late\nonset infection")
+
+#collate figure
+figure_one <- ggarrange(ecoli_overall_numbers, ecoli_overall_incidence, age_ecoli,
+                    nrow = 3, align = "v", labels = c("a", "b", "c"))
+
+#plot figure
+figure_one
+
+```
+
+```{r st distribution, echo = FALSE, message = FALSE, echo = FALSE, warning = FALSE}
+
+mlst_numbers <- genome_data %>%
+  group_by(ST, st_group) %>%
+  count(ST) %>% 
+  arrange(desc(n)) %>%
+  ungroup() %>%
+  mutate(ST = fct_inorder(ST)) %>%
+  filter(!is.na(ST))
+
+untyped <- genome_data %>%
+  filter(ST == "-")
+
+individual_sts <- genome_data %>% 
+  group_by(ST, Year) %>% 
+  count() %>% 
+  group_by(ST) %>% 
+  count() %>% 
+  arrange(n)
+
+```
+
+### Figure 2
+
+```{r st graph, echo = FALSE, message = FALSE, fig.dim = c(10, 12), fig.cap = "Figure 2", warning = FALSE}
+
+sanglink3 <- genome_data %>%
+  filter(!is.na(O_overall)) %>%
+  mutate(success = "Successfully sequenced") %>%
+  select(hosp_id, success)
+
+timeline3 <- clin %>% 
+  select(hosp_id, Year) %>%
+  left_join(sanglink3, by = "hosp_id") %>%
+  replace_na(list(success = "Not recovered/failed QC")) %>%
+  group_by(Year, success) %>%
+  count() %>%
+  filter(!is.na(Year)) %>%
+  mutate(success = as.character(success))
+
+mlst_numbers2 <- mlst_numbers %>%
+  mutate(ST = case_when(ST == "-" ~ "Untyped",
+                        TRUE ~ ST)) %>%
+  mutate(ST = fct_inorder(ST))
+
+graph_mlst <- ggplot(mlst_numbers2) +
+  geom_col(aes(x = ST, y = n, fill = st_group), colour = "black") +
+  labs(y = "Number of isolates") +
+  scale_fill_brewer(palette = "Set3") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+mlst_yeargraph <- genome_data %>%
+  group_by(Year, st_group) %>%
+  count() %>%
+  filter(!is.na(Year),
+         !is.na(st_group))
+
+mlst_year_props <- genome_data %>% 
+  group_by(Year, ST) %>% 
+  count() %>% 
+  arrange(Year, desc(n)) %>% 
+  group_by(Year) %>% 
+  mutate(sum = sum(n), prop = n/sum)
+
+graph_mlstyear <- ggplot(mlst_yeargraph) +
+  geom_col(aes(x = Year, fill = st_group, y = n), colour = "black", position = "fill") +
+  scale_fill_brewer(palette = "Set3") +
+  labs(x = "Year",
+       y = "Proportion of isolates\nof each ST") +
+  theme(legend.position = "none")
+
+success_cols <- c("Not recovered/failed QC" = "tomato",
+                  "Successfully sequenced" = "lightgrey")
+
+ecoli_sequenced <- ggplot() +
+  geom_col(data = timeline3, aes(x = Year, y = n, fill = success), colour = "black") +
+  xlab("Year of isolation") +
+  ylab("Number of E. coli\nisolates sequenced") +
+  scale_fill_manual(values = success_cols,
+                    name = "Sequencing status")
+
+figure_two <- ggarrange(ecoli_sequenced, graph_mlst, graph_mlstyear, labels = c("a", "b", "c"), nrow = 3, align = "v")
+figure_two
+
+```
+
+
+```{r serotyping, echo = FALSE, warning = FALSE}
+#EXPEC10 = O1A, O2, O4, O6A, O8, O15, O16, O18A, O25B and O75
+#EXPEC4 = O1A, O2, O6A and O25B
+
+
+expec10 <- c("O1A", "O2", "O4", "O6?", "O8", "O15", "O16", "O18A?", "O25B", "O75")
+expec9 <- c("O1A", "O2", "O4", "O6?", "O15", "O18A?", "O75", "O16", "O25B")
+expec4 <- c("O1A", "O2", "O6?", "O25B")
+
+otype_all <- data.frame(otype = genome_data$O_overall,
+                        n = seq(1, length(genome_data$O_overall)),
+                        Year = genome_data$Year) %>%
+  filter(otype != "",
+         otype != "<NA>") %>%
+  mutate(o_group = case_when(otype == "O15" ~ otype,
+                             otype == "O25B" ~ otype,
+                             otype == "O8" ~ otype,
+                             otype == "O17" ~ otype,
+                             otype == "O18A?" ~ otype,
+                             otype == "O45" ~ otype,
+                             otype == "O1A" ~ otype,
+                             otype == "O11" ~ otype,
+                             otype == "O6?" ~ otype,
+                             otype == "O16" ~ otype,
+                             TRUE ~ "Other O-type"))
+
+otype_count <- otype_all %>%
+  group_by(otype, o_group) %>%
+  count(otype) %>%
+  arrange(desc(n)) %>%
+  ungroup() %>%
+  mutate(otype = fct_inorder(otype))
+
+otype_yeartot <- otype_all %>% 
+  count(Year) %>%
+  rename(sum = n)
+
+otype_yearnum <- otype_all %>%
+  group_by(otype, Year) %>%
+  count() %>%
+  full_join(otype_yeartot, by = "Year") %>%
+  mutate(percent = percent(n, sum))
+
+otype_maxpercent <- otype_yearnum %>%
+  filter(Year != 2012 , Year != 2015, Year != 2021) %>%
+  arrange(desc(percent)) %>%
+  ungroup() %>%
+  slice_head(n = 1)
+
+htype_all <- data.frame(htype = c(genome_data$H1, genome_data$H2),
+                        n = seq(1, length(c(genome_data$H1, genome_data$H2))),
+                        Year = c(genome_data$Year, genome_data$Year)) %>%
+  filter(htype != "",
+         htype != "<NA>") %>%
+  mutate(h_group = case_when(htype == "H4" ~ htype,
+                             htype == "H18" ~ htype,
+                             htype == "H5" ~ htype,
+                             htype == "H9" ~ htype,
+                             htype == "H7" ~ htype,
+                             htype == "H1" ~ htype,
+                             htype == "H10" ~ htype,
+                             htype == "H45" ~ htype,
+                             htype == "H2" ~ htype,
+                             htype == "H31" ~ htype,
+                             htype == "H16" ~ htype,
+                             TRUE ~ "Other H-type"))
+
+htype_count <- htype_all %>%
+  group_by(htype, h_group) %>%
+  count(htype) %>%
+  arrange(desc(n)) %>%
+  ungroup() %>%
+  mutate(htype = fct_inorder(htype))
+
+htype_yeartot <- htype_all %>% 
+  count(Year) %>%
+  rename(sum = n)
+
+htype_yearnum <- htype_all %>%
+  group_by(htype, Year) %>%
+  count() %>%
+  full_join(htype_yeartot, by = "Year") %>%
+  mutate(percent = percent(n, sum))
+
+htype_maxpercent <- htype_yearnum %>%
+  filter(Year != 2012 , Year != 2015, Year != 2021) %>%
+  arrange(desc(percent)) %>%
+  ungroup() %>%
+  slice_head(n = 1)
+```
+
+
+```{r o antigen graph, echo = FALSE, fig.dim = c(10, 12), warning = FALSE, message = FALSE}
+
+graph_otypeall <- ggplot(otype_count) + 
+  geom_col(aes(x = otype, y = n, fill = o_group), colour = "black") + 
+  scale_fill_brewer(palette = "Paired") +
+  labs(x = "O-type",
+      y = "Number of isolates") + 
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 0.5, size = 6))
+
+otype_yeargraph <- otype_all %>%
+  group_by(Year, o_group) %>%
+  count() %>%
+  filter(!is.na(Year))
+
+graph_otypeyear <- ggplot(otype_yeargraph) +
+  geom_col(aes(x = Year, fill = o_group, y = n), colour = "black", position = "fill") +
+  scale_fill_brewer(palette = "Paired") +
+  labs(x = "Year",
+       y = "Proportion of isolates\nof each O-type") +
+  theme(legend.position = "none")
+
+```
+
+
+### Figure 3
+
+```{r h antigen graph, echo = FALSE, fig.cap = "Figure 3", warning = FALSE, message = FALSE, fig.dim = c(10, 10)}
+
+
+htype_cols <- c("H1" = "#99CC99", 
+                "H10" = "#77FF77", 
+                "H16" = "#113344", 
+                "H18" = "#DDEE00", 
+                "H2" = "#118811", 
+                "H31" = "#4444FF", 
+                "H4" = "#FFFFCC", 
+                "H45" = "#00FFFF", 
+                "H5" = "#EEEE11", 
+                "H7" = "#9999DD", 
+                "H9" = "#FFBB00", 
+                "Other H-type" = "#DDDDDD")
+
+graph_htypeall <- ggplot(htype_count) + 
+  geom_col(aes(x = htype, y = n, fill = h_group), colour = "black") + 
+  scale_fill_manual(values = htype_cols) +
+  labs(x = "H-type",
+      y = "Number of isolates") + 
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+htype_yeargraph <- htype_all %>%
+  group_by(Year, h_group) %>%
+  count() %>%
+  filter(!is.na(Year))
+
+graph_htypeyear <- ggplot(htype_yeargraph) +
+  geom_col(aes(x = Year, fill = h_group, y = n), colour = "black", position = "fill") +
+  scale_fill_manual(values = htype_cols) +
+  labs(x = "Year",
+       y = "Proportion of isolates\nof each H-type") +
+  theme(legend.position = "none")
+
+figure_three <- ggarrange(graph_otypeall, graph_otypeyear, 
+          graph_htypeall, graph_htypeyear, 
+          labels = c("a", "b", "c", "d"), nrow = 2, ncol = 2)
+figure_three
+
+```
+
+```{r vaccines, echo = FALSE, warning = FALSE, echo = FALSE}
+
+#EXPEC10 = O1A, O2, O4, O6A, O8, O15, O16, O18A, O25B and O75
+#EXPEC4 = O1A, O2, O6A and O25B
+
+vacc_htype <- htype_all %>%
+  ungroup() %>%
+  count(htype) %>%
+  arrange(desc(n)) %>%
+  mutate(htype = fct_inorder(htype)) %>%
+  rowid_to_column(var = "number") %>%
+  mutate(antigen = "htype") %>%
+  rename(specific_type = htype) %>%
+  #accounting for phase variation by including only the first occurring H type - have now changed this so both are included
+  #filter(specific_type != "H55",
+  #       specific_type != "H54",
+  #       specific_type != "H35") %>%
+  #mutate(n = case_when(specific_type == "H36" ~ as.double(1),
+  #                     TRUE ~ as.double(n))) %>%
+  mutate(cumsum = cumsum(n)/169)
+
+vacc_otype <- otype_all %>%
+  ungroup() %>%
+  count(otype) %>%
+  arrange(desc(n)) %>%
+  mutate(otype = fct_inorder(otype)) %>%
+  rowid_to_column(var = "number") %>%
+  mutate(antigen = "otype") %>%
+  rename(specific_type = otype) %>% 
+  #accounting for phase variation by including only the first occurring O type - have now changed this so both are included
+  #filter(specific_type != "O160",
+  #       specific_type != "O178") %>%
+  mutate(cumsum = cumsum(n)/169)
+
+expec10_table <- vacc_otype %>%
+  mutate(n = case_when(specific_type %in% expec10 ~ n,
+                       TRUE ~ as.integer(0))) %>%
+  mutate(cumsum = cumsum(n)/169) %>%
+  mutate(antigen = "expec10")
+
+expec9_table <- vacc_otype %>%
+  mutate(n = case_when(specific_type %in% expec9 ~ n,
+                       TRUE ~ as.integer(0))) %>%
+  mutate(cumsum = cumsum(n)/169) %>%
+  mutate(antigen = "expec9")
+
+expec4_table <- vacc_otype %>%
+  mutate(n = case_when(specific_type %in% expec4 ~ n,
+                       TRUE ~ as.integer(0))) %>%
+  mutate(cumsum = cumsum(n)/169) %>%
+  mutate(antigen = "expec4")
+
+start <- data.frame(number = 0,
+                    specific_type = NA,
+                    n = 0, 
+                    antigen = c("otype", "htype", "expec10", "expec4"),
+                    cumsum = 0)
+
+otype_80 <- vacc_otype %>% 
+  filter(cumsum > 0.8) %>% 
+  slice_head(n = 1) %>% 
+  pull(number)
+
+htype_80 <- vacc_htype %>% 
+  filter(cumsum > 0.8) %>% 
+  slice_head(n = 1) %>% 
+  pull(number)
+
+both_vacc <- rbind(start, vacc_htype, vacc_otype, expec10_table, expec4_table)
+
+both_vacc_9V <- rbind(start, vacc_htype, vacc_otype, expec9_table, expec4_table)
+
+#top 4 o-types
+top4 <- sum(vacc_otype %>% slice_head(n = 4) %>% pull(n))
+top9 <- sum(vacc_otype %>% slice_head(n = 9) %>% pull(n))
+
+
+top9_byyear <- otype_all %>% 
+  group_by(Year, otype) %>% 
+  count() %>% 
+  group_by(Year) %>% 
+  mutate(sum = sum(n)) %>% 
+  filter(otype %in% c("O15", "O25B", "O8", "O17", "O18A?", "O11", "O16", "O1A", "O45")) %>% 
+  group_by(Year) %>% 
+  mutate(number_year = sum(n)) %>% 
+  mutate(prop = number_year/sum*100)
+
+top4_byyear <- otype_all %>% 
+  group_by(Year, otype) %>% 
+  count() %>% 
+  group_by(Year) %>% 
+  mutate(sum = sum(n)) %>% 
+  filter(otype %in% c("O15", "O25B", "O8", "O17")) %>% 
+  group_by(Year) %>% 
+  mutate(number_year = sum(n)) %>% 
+  mutate(prop = number_year/sum*100)
+
+```
+
+
+### Figure 4
+
+```{r vaccine graph, echo = FALSE, warning = FALSE, fig.dim = c(10, 10), fig.cap = "Figure 4"}
+
+
+otype_vaccine_count_9V <- otype_count %>%
+  mutate(vacc = case_when(otype %in% expec4 ~ "EXPEC4V",
+                          otype %in% expec9 ~ "EXPEC9V",
+                          TRUE ~ "Non vaccine O-type"))
+
+cols_vacc2_9V <- c("EXPEC4V" = "#FFAA55",
+                "EXPEC9V" = "#FF5555",
+                "Non vaccine O-type" = "#EEEEEE")
+
+graph_otypeall_vacc_9V <- ggplot(otype_vaccine_count_9V) + 
+  geom_col(aes(x = otype, y = n, fill = vacc), colour = "black") + 
+  scale_fill_manual(values = cols_vacc2_9V, 
+                    name = "Vaccine coverage") +
+  labs(x = "O-type",
+      y = "Number of isolates") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+otype_yeargraph_vacc_9V <- otype_all %>%
+  mutate(vacc = case_when(otype %in% expec4 ~ "EXPEC4V",
+                          otype %in% expec9 ~ "EXPEC9V",
+                          TRUE ~ "Non vaccine O-type")) %>%
+  mutate(vacc = as.factor(vacc)) %>%
+  mutate(vacc = fct_relevel(vacc, "EXPEC4V")) %>%
+  group_by(Year, vacc) %>%
+  count() %>%
+  filter(!is.na(Year))
+
+vaccines_byyear_9V <- otype_yeargraph_vacc_9V %>% 
+  group_by(Year) %>% 
+  mutate(sum = sum(n), prop = n/sum*100) %>% filter(sum >= 10)
+
+graph_otypeyear_vacc_9V <- ggplot(otype_yeargraph_vacc_9V) +
+  geom_col(aes(x = Year, fill = vacc, y = n), colour = "black", position = "fill") +
+  scale_fill_manual(values = cols_vacc2_9V) +
+  theme(legend.position = "none") +
+  labs(x = "Year",
+       y = "Proportion of isolates\nof each O-type")
+
+cols_vacc_9V <- c("otype" = "#FFAAFF",
+               "htype" = "#AAAAFF",
+               "expec9" = "#AAFFAA",
+               "expec4" = "#FFDD00")
+
+rarefaction_both_9V <- ggplot(both_vacc_9V %>% mutate(antigen = as.factor(antigen))) + 
+  geom_line(aes(x = number, y = cumsum, colour = antigen), lwd = 1) +
+  geom_point(aes(x = number, y = cumsum, colour = antigen), lwd = 2) +
+  geom_hline(aes(yintercept = 0.8)) +
+  labs(x = "O or H type",
+       y = "Cumulative proportion\nof isolates covered",
+       colour = "Antigen/vaccine") +
+  scale_colour_manual(values = cols_vacc_9V, 
+    labels  = c("EXPEC4V", "EXPEC9V", "All H-types", "All O-types"))
+  
+figure_four <- ggarrange(rarefaction_both_9V, 
+                            graph_otypeall_vacc_9V, 
+                            graph_otypeyear_vacc_9V, 
+                            labels = c("a", "b", "c"), 
+                            nrow = 3,
+                            align = "v")
+
+#vacc_numbertwo <- ggarrange(rarefaction_both, vacc_numberone, labels = c("A", ""), nrow = 2, heights = c(1, 2), align = "v")
+
+figure_four
+
+```
+
+
+
+
+```{r amr genes, echo = FALSE}
+
+amrfinder2 <- amrfinder %>%
+  filter(Contig.id != "Contig id") %>%
+  mutate(Lane = substr(Contig.id, 2, nchar(Contig.id)),
+         Lane = paste(substr(Lane, 1, 7), substr(Lane, 9, nchar(Lane)), sep = "#"),
+         Lane = gsub("\\..*","", Lane)) %>%
+  filter(Element.type == "AMR") %>%
+  filter(Lane %in% good_overall$Sample)
+
+amr_numbers <- amrfinder2 %>%
+  group_by(Lane) %>%
+  count()
+
+amr_numbers2 <- quantile(amr_numbers$n)
+
+amr_important <- amrfinder2 %>%
+  filter(Element.type == "AMR") %>%
+  group_by(Class) %>%
+  count(Gene.symbol) %>%
+  arrange(desc(Class), desc(n)) %>%
+  ungroup() %>%
+  mutate(Gene.symbol = fct_inorder(Gene.symbol))
+
+amr_st <- amrfinder2 %>%
+  rename(Sample = Lane) %>%
+  left_join(genome_data, by = "Sample") 
+
+amr_st2 <- amr_st %>%
+  group_by(ST, Sample) %>% 
+  count() %>%
+  group_by(ST) %>%
+  summarise(mean = mean(n), sd = sd(n)) %>%
+  arrange(mean)
+
+cefalosporins <- amr_st %>%
+  filter(Subclass == "CEPHALOSPORIN")
+
+amikacin <- amrfinder2 %>%
+  filter(Subclass == "AMIKACIN/KANAMYCIN/QUINOLONE/TOBRAMYCIN") %>%
+  count(Gene.symbol)
+
+chloramphenicol <- amrfinder2 %>%
+  filter(Subclass == "CHLORAMPHENICOL") %>%
+  count(Gene.symbol)
+
+gentamicin <- amrfinder2 %>%
+  filter(Subclass == "GENTAMICIN") %>%
+  count(Gene.symbol)
+
+quinolone <- amr_st %>%
+  filter(Subclass == "QUINOLONE") %>%
+  count(Gene.symbol)
+
+colistin <- amrfinder2 %>%
+  filter(Subclass == "COLISTIN") %>%
+  count(Gene.symbol)
+
+multi <- amrfinder %>%
+  filter(Subclass == "AMPICILLIN/CHLORAMPHENICOL/QUINOLONE/RIFAMPIN/TETRACYCLINE") %>%
+  count(Gene.symbol)
+
+```
+
+
+### Figure 5
+
+```{r resistant, echo = FALSE, fig.dim = c(10, 10), fig.cap = "Figure 5", warning = FALSE, message = FALSE}
+
+
+col_res <- c("Amikacin" = "#FFDDDD",
+             "Ampicillin" = "#0099FF",
+             "Co-amoxiclav" = "#FF0033",
+             "Ceftriaxone" = "#008888",
+             "Chloramphenicol" = "#992200",
+             "Ciprofloxacin" = "#CCFFEE",
+             "Co-trimoxazole" = "#00DD00",
+             "Gentamicin" = "#000077",
+             "Meropenem" = "#DDDDDD")
+
+col_res2 <- c("First-line" = "#0099FF",
+             "Second-line" = "#FFBB00",
+             "Occasional use" = "#FF0033",
+             "Not used" = "#AAAAAA")
+
+#ggplot(resistant_res_graph) +
+#  geom_line(aes(x = Year, y = percent, group = 1, colour = line), lwd = 1) +
+#    geom_point(aes(x = Year, y = percent, group = 1, colour = line), lwd = 2) +
+#  facet_wrap(vars(antibiotic)) +
+#  scale_colour_manual(values = col_res2, 
+#                      name = "Antibiotic usage") +
+#  #theme(legend.position = "none") +
+#  labs(y = "Resistant or Intermediate (%)",
+#       x = "Year")
+
+#ggplot(resistant_res_graph) +
+#  geom_line(aes(x = Year, y = percent, group = 1, colour = line), lwd = 1) +
+#  geom_point(aes(x = Year, y = percent, group = 1, colour = line), lwd = 2) +
+#  facet_grid(vars(percent), rows = vars(line)) +
+#  scale_colour_manual(values = col_res2, 
+  #theme(legend.position = "none") +
+#                      name = "Antibiotic usage") +
+#  labs(y = "Resistant or Intermediate (%)",
+#       x = "Year")
+
+
+firstline <- ggplot(resistant_res_graph %>% filter(line == "First-line")) +
+  geom_line(aes(x = Year, y = percent, group = 1, colour = line), lwd = 1) +
+  geom_point(aes(x = Year, y = percent, group = 1, colour = line), lwd = 2) +
+  geom_smooth(aes(x = Year, y = percent, group = 1, colour = "black"), method = "lm") +
+  facet_wrap(vars(antibiotic)) +
+  scale_colour_manual(values = col_res2) +
+  theme(legend.position = "none",
+        plot.margin = unit(c(0, 0, 0, 0), 
+                                "cm")) +
+  labs(y = "Resistant or\nIntermediate (%)",
+       x = "Year") +
+  coord_cartesian(x = c(2012, 2021),
+       y = c(0, 100))
+
+secondline <- ggplot(resistant_res_graph %>% filter(line == "Second-line")) +
+  geom_line(aes(x = Year, y = percent, group = 1, colour = line), lwd = 1) +
+  geom_point(aes(x = Year, y = percent, group = 1, colour = line), lwd = 2) +
+  geom_smooth(aes(x = Year, y = percent, group = 1, colour = "black"), method = "lm") +
+  facet_wrap(vars(antibiotic)) +
+  scale_colour_manual(values = col_res2) +
+  theme(legend.position = "none",
+        plot.margin = unit(c(0, 0, 0, 0), 
+                                "cm")) +
+  labs(y = "Resistant or\nIntermediate (%)",
+       x = "Year") +
+  coord_cartesian(x = c(2012, 2021),
+       y = c(0, 100))
+
+occasional <- ggplot(resistant_res_graph %>% filter(line == "Occasional use")) +
+  geom_line(aes(x = Year, y = percent, group = 1, colour = line), lwd = 1) +
+  geom_point(aes(x = Year, y = percent, group = 1, colour = line), lwd = 2) +
+  geom_smooth(aes(x = Year, y = percent, group = 1, colour = "black"), method = "lm") +
+  facet_wrap(vars(antibiotic)) +
+  scale_colour_manual(values = col_res2) +
+  theme(legend.position = "none",
+        plot.margin = unit(c(0, 0, 0, 0), 
+                                "cm")) +
+  labs(y = "Resistant or\nIntermediate (%)",
+       x = "Year") +
+  coord_cartesian(x = c(2012, 2021),
+       y = c(0, 100))
+
+notused <- ggplot(resistant_res_graph %>% filter(line == "Not used")) +
+  geom_line(aes(x = Year, y = percent, group = 1, colour = line), lwd = 1) +
+  geom_point(aes(x = Year, y = percent, group = 1, colour = line), lwd = 2) +
+  geom_smooth(aes(x = Year, y = percent, group = 1, colour = "black"), method = "lm") +
+  facet_wrap(vars(antibiotic), nrow = 1) +
+  scale_colour_manual(values = col_res2) +
+  theme(legend.position = "none",
+        plot.margin = unit(c(0, 0, 0, 0), 
+                                "cm")) +
+  labs(y = "Resistant or\nIntermediate (%)",
+       x = "Year") +
+  coord_cartesian(x = c(2012, 2021),
+       y = c(0, 100))
+
+
+firstline2 <- ggarrange(firstline, 
+                        labels = "a",
+                        nrow = 1, 
+                        ncol = 2, 
+                        widths = c(1.15, 1))
+
+secondline2 <- ggarrange(secondline,
+                         labels = "b",
+                         nrow = 1,
+                         ncol = 4,
+                         widths = c(1.3, 1, 1, 1))
+
+occasional2 <- ggarrange(occasional,
+                        labels = "c",
+                        nrow = 1, 
+                        ncol = 2, 
+                        widths = c(1.15, 1, 1, 1))
+
+notused2 <- ggarrange(notused,
+                      labels = "d",
+                      nrow = 1,
+                      ncol = 1)
+
+
+figure_five <- ggarrange(firstline2, secondline2, occasional2, notused2, 
+          nrow = 4, 
+          align = "v")
+figure_five
+```
+
+```{r plasmids, echo = FALSE, warning = FALSE}
+
+
+plas <- genome_data %>%
+  select(Sample, contains("match")) %>%
+  filter(Sample %in% good_overall$Sample) %>%
+  rename(Lane = Sample)
+
+plas2 <- plas %>%
+  select(-Lane) 
+
+plas2[plas2 == "no"] <- 0
+plas2[plas2 == "yes"] <- 1
+
+plas3 <- plas %>%
+  select(Lane) 
+
+plas4 <- cbind(plas3, plas2) %>%
+  pivot_longer(cols = -Lane,
+               names_to = "replicon",
+               values_to = "present") 
+
+plas5 <- plas4 %>%
+  group_by(replicon) %>%
+  mutate(present = as.numeric(present)) %>%
+  summarise(sum = sum(present)) %>%
+  arrange(desc(sum))
+
+mlst_plas <- genome_data %>%
+  rename(Lane = Sample) %>%
+  select(Lane, ST)
+
+plas_st <- plas4 %>%
+  left_join(mlst_plas, by = "Lane") %>%
+  mutate(present = as.numeric(present)) %>%
+  group_by(replicon, ST) %>%
+  summarise(sum = sum(present))
+
+```
+
+## Supplementary materials
+
+### Supplementary Figure 1
+
+```{r timeline graph, echo = FALSE, fig.dim = c(10, 10), fig.cap = "Supplementary Figure 1"}
+
+cols_ward <- c("CHATINKHA NURSERY" = "#DD0000",
+               "PAEDIATRIC A&E" = "#00DD00",
+               "PAEDIATRIC NURSERY" = "#0000DD",
+               "PAEDIATRIC SURGICAL WARD"= "#DDDD00",
+               "PICU/HDU" = "#DD00DD")
+
+supp_figure_one <- ggplot(timeline %>% filter(Year != 2012, Year != 2021)) +
+  geom_col(aes(x = Year, y = n, fill = ward), colour = "black") +
+  facet_wrap(vars(ward), nrow = 5) +
+  scale_fill_manual(values = cols_ward) +
+  theme(legend.position = "blank") +
+  labs(x = "Year",
+       y = "Number of cases")
+
+```
+
+### Supplementary Figure 2
+
+This is not present in this markdown file, but can be found on the github page. 
+
+
+```{r supplementary figure 2, echo = FALSE, fig.cap = "Supplementary Figure 2"}
+
+
+```
+
+
+### Supplementary Figure 3
+
+```{r vaccine graph supp, echo = FALSE, warning = FALSE, fig.dim = c(10, 10), fig.cap = "Supplementary Figure 3"}
+
+
+otype_vaccine_count <- otype_count %>%
+  mutate(vacc = case_when(otype %in% expec4 ~ "EXPEC4V",
+                          otype %in% expec10 ~ "EXPEC10V",
+                          TRUE ~ "Non vaccine O-type"))
+
+cols_vacc2 <- c("EXPEC4V" = "#FFAA55",
+                "EXPEC10V" = "#FF5555",
+                "Non vaccine O-type" = "#EEEEEE")
+
+graph_otypeall_vacc <- ggplot(otype_vaccine_count %>% 
+                                mutate(vacc = as.factor(vacc), 
+                                       vacc = fct_relevel(vacc, "EXPEC4V"))) + 
+  geom_col(aes(x = otype, y = n, fill = vacc), colour = "black") + 
+  scale_fill_manual(values = cols_vacc2, 
+                    name = "Vaccine coverage") +
+  labs(x = "O-type",
+      y = "Number of isolates") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+otype_yeargraph_vacc <- otype_all %>%
+  mutate(vacc = case_when(otype %in% expec4 ~ "EXPEC4V",
+                          otype %in% expec10 ~ "EXPEC10V",
+                          TRUE ~ "Non vaccine O-type")) %>%
+  mutate(vacc = as.factor(vacc)) %>%
+  mutate(vacc = fct_relevel(vacc, "EXPEC4V")) %>%
+  group_by(Year, vacc) %>%
+  count() %>%
+  filter(!is.na(Year))
+
+vaccines_byyear <- otype_yeargraph_vacc %>% 
+  group_by(Year) %>% 
+  mutate(sum = sum(n), prop = n/sum*100) %>% filter(sum >= 10)
+
+graph_otypeyear_vacc <- ggplot(otype_yeargraph_vacc %>% 
+                                mutate(vacc = as.factor(vacc), 
+                                       vacc = fct_relevel(vacc, "EXPEC4V"))) +
+  geom_col(aes(x = Year, fill = vacc, y = n), colour = "black", position = "fill") +
+  scale_fill_manual(values = cols_vacc2) +
+  theme(legend.position = "none") +
+  labs(x = "Year",
+       y = "Proportion of isolates\nof each O-type")
+
+cols_vacc <- c("otype" = "#FFAAFF",
+               "htype" = "#AAAAFF",
+               "expec10" = "#AAFFAA",
+               "expec4" = "#FFDD00")
+
+rarefaction_both <- ggplot(both_vacc %>% 
+                             mutate(antigen = as.factor(antigen),
+                                    antigen = fct_relevel(antigen, "expec4"))) + 
+  geom_line(aes(x = number, y = cumsum, colour = antigen), lwd = 1) +
+  geom_point(aes(x = number, y = cumsum, colour = antigen), lwd = 2) +
+  geom_hline(aes(yintercept = 0.8)) +
+  labs(x = "O or H type",
+       y = "Cumulative proportion\nof isolates covered",
+       colour = "Antigen/vaccine") +
+  scale_colour_manual(values = cols_vacc, 
+    labels  = c("EXPEC4V", "EXPEC10V", "All H-types", "All O-types"))
+  
+supp_figure_three <- ggarrange(rarefaction_both, 
+                            graph_otypeall_vacc, 
+                            graph_otypeyear_vacc, 
+                            labels = c("a", "b", "c"), 
+                            nrow = 3,
+                            align = "v")
+supp_figure_three
+
+```
+
+#Supplementary Figure 4
+
+```{r supplementary rarefaction curve, echo = FALSE, fig.dim = c(10, 10), fig.cap = "Supplementary Figure 4", warning = FALSE, message = FALSE}
+
+vacc_htype_supplementary <- htype_all %>%
+  ungroup() %>%
+  count(htype) %>%
+  arrange(desc(n)) %>%
+  mutate(htype = fct_inorder(htype)) %>%
+  rowid_to_column(var = "number") %>%
+  mutate(antigen = "htype") %>%
+  rename(specific_type = htype) %>%
+  #accounting for phase variation by including only the first occurring H type - have done this for the supplementary figure
+  filter(specific_type != "H55",
+         specific_type != "H54",
+         specific_type != "H35") %>%
+  mutate(n = case_when(specific_type == "H36" ~ as.double(1),
+                       TRUE ~ as.double(n))) %>%
+  mutate(cumsum = cumsum(n)/169)
+
+vacc_otype_supplementary <- otype_all %>%
+  ungroup() %>%
+  count(otype) %>%
+  arrange(desc(n)) %>%
+  mutate(otype = fct_inorder(otype)) %>%
+  rowid_to_column(var = "number") %>%
+  mutate(antigen = "otype") %>%
+  rename(specific_type = otype) %>% 
+  #accounting for phase variation by including only the first occurring O type - have done this for the supplementary figure
+  #filter(specific_type != "O160",
+  #       specific_type != "O178") %>%
+  mutate(cumsum = cumsum(n)/169)
+
+both_vacc_supplementary <- rbind(start, vacc_htype_supplementary, vacc_otype_supplementary, expec9_table, expec4_table)
+
+cols_vacc <- c("otype" = "#FFAAFF",
+               "htype" = "#AAAAFF",
+               "expec9" = "#AAFFAA",
+               "expec4" = "#FFDD00")
+
+supp_figure_four <- ggplot(both_vacc_supplementary) + 
+  geom_line(aes(x = number, y = cumsum, colour = antigen), lwd = 1) +
+  geom_point(aes(x = number, y = cumsum, colour = antigen), lwd = 2) +
+  geom_hline(aes(yintercept = 0.8)) +
+  labs(x = "O or H type",
+       y = "Cumulative proportion\nof isolates covered",
+       colour = "Antigen/vaccine") +
+  scale_colour_manual(values = cols_vacc, 
+    labels  = c("EXPEC4V", "EXPEC9V", "All H-types", "All O-types"))
+supp_figure_four
+
+```
+
+
+### Supplementary Figure 5
+
+```{r amr figure, echo = FALSE, fig.dim = c(10, 12), fig.cap = "Supplementary Figure 5"}
+
+supp_figure_five <- ggplot(amr_important) +
+  geom_col(aes(x = Gene.symbol, y = n, fill = Class), colour = "black") +
+  coord_flip() +
+  scale_fill_manual(values=as.vector(trubetskoy(15))) +
+  labs(y = "Number of isolates",
+       x = "AMR gene",
+       fill = "Gene class")
+supp_figure_five
+```
+
+
+
+
+
+
