@@ -20,11 +20,7 @@ The Rmarkdown document ecoli_invasive_markdown.Rmd contains the code to generate
 
 If you use the data from this repository please cite:
 
-**Add paper citation when it is published**
-
-High diversity of Escherichia coli causing invasive disease in neonates in Malawi poses challenges for O-antigen based vaccine approach
-Oliver Pearse, Allan Zuza, Edith Tewesa, Patricia Siyabuh, Alice J Fraser, Jennifer Cornick, Kondwani Kawaza, Patrick Musicha, Nicholas R Thomson, Nicholas A Feasey, Eva Heinz
-medRxiv 2024.09.24.24314145; doi: https://doi.org/10.1101/2024.09.24.24314145
+Pearse, O., Zuza, A., Tewesa, E. et al. High diversity of Escherichia coli causing invasive disease in neonates in Malawi poses challenges for O-antigen based vaccine approach. Commun Med 5, 298 (2025). https://doi.org/10.1038/s43856-025-01007-1
 
 ## License
 
